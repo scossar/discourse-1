@@ -21,15 +21,34 @@ $mobile-breakpoint: 700px;
   }
 }
 
+.admin-contents {
+  position: relative;
+}
+
 .admin-contents table {
   width: 100%;
-  tr {text-align: left;}
-  td, th {padding: 8px;}
-  th {border-top: 1px solid dark-light-diff($primary, $secondary, 90%, -60%);}
-  td {border-bottom: 1px solid dark-light-diff($primary, $secondary, 90%, -60%); border-top: 1px solid dark-light-diff($primary, $secondary, 90%, -60%);}
-  tr:hover { background-color: darken($secondary, 2.5%); }
-  tr.selected { background-color: lighten($primary, 80%); }
-  .filters input { margin-bottom: 0; }
+  tr {
+    text-align: left;
+  }
+  td, th {
+    padding: 8px;
+  }
+  th {
+    border-top: 1px solid dark-light-diff($primary, $secondary, 90%, -60%);
+  }
+  td {
+    border-bottom: 1px solid dark-light-diff($primary, $secondary, 90%, -60%);
+    border-top: 1px solid dark-light-diff($primary, $secondary, 90%, -60%);
+  }
+  tr:hover {
+    background-color: darken($secondary, 2.5%);
+  }
+  tr.selected {
+    background-color: lighten($primary, 80%);
+  }
+  .filters input {
+    margin-bottom: 0;
+  }
 }
 
 td.flaggers td {
@@ -93,7 +112,7 @@ td.flaggers td {
     width: 460px;
     right: 0px;
     z-index: 990;
-    box-shadow: 0 2px 6px rgba(0,0,0, .8);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, .8);
     margin-top: -2px;
     background-color: $secondary;
     padding: 12px 12px 5px;
@@ -103,9 +122,15 @@ td.flaggers td {
       max-height: 200px;
       overflow: auto;
       width: 455px;
-      ul { margin: 0; }
-      li { list-style: none; }
-      tr td:first-of-type { width: 130px; }
+      ul {
+        margin: 0;
+      }
+      li {
+        list-style: none;
+      }
+      tr td:first-of-type {
+        width: 130px;
+      }
     }
   }
 }
@@ -125,6 +150,9 @@ td.flaggers td {
 .admin-controls {
   background-color: dark-light-diff($primary, $secondary, 90%, -75%);
   padding: 10px 10px 3px 0;
+  // Bring the box flush with the edge of the screen - this cancels $mobile-wrapper-padding
+  // that is set in mobile/discourse.scss
+  margin: auto -10px;
   @include clearfix;
   .nav.nav-pills {
     li.active {
@@ -144,6 +172,24 @@ td.flaggers td {
   }
   .controls {
     margin-left: 10px;
+  }
+
+  .controls .menu-toggle {
+    display: none;
+    float: left;
+    font-size: 26px;
+    padding: 3px 6px;
+    margin-right: 32px;
+    border: 1px solid lighten($primary, 40%);
+    border-radius: 3px;
+    background: transparent;
+    color: $primary;
+    &:hover {
+      background-color: lighten($primary, 60%);
+    }
+    @media (max-width: $mobile-breakpoint) {
+      display: inline-block;
+    }
   }
   button {
     margin-right: 5px;
@@ -214,12 +260,19 @@ td.flaggers td {
 
 .admin-nav {
   width: 18.018%;
+  position: relative;
+  // .admin-nav becomes a slide-out menu at the mobile-nav breakpoint.
   @media (max-width: $mobile-breakpoint) {
-    width: 33%;
+    position: absolute;
+    z-index: 0;
+    width: 50%;
   }
   margin-top: 30px;
   .nav-stacked {
     border-right: none;
+    @media (max-width: $mobile-breakpoint) {
+      margin-right: 10px;
+    }
   }
   li a.active {
     color: $secondary;
@@ -228,16 +281,31 @@ td.flaggers td {
 }
 
 .admin-detail {
+  z-index: 10;
   width: 76.5765%;
   @media (max-width: $mobile-breakpoint) {
-    width: 67%;
+    width: 100%
   }
-  min-height: 800px;
+  background-color: $secondary;
+  min-height: 875px; // Todo: set this properly - it needs to be >= menu height
   margin-left: 0;
-  border-left: solid 1px dark-light-diff($primary, $secondary, 90%, -60%);
   padding: 30px 0 30px 30px;
   @media (max-width: $mobile-breakpoint) {
-    padding: 30px 0 30px 16px;
+    padding: 30px 0;
+  }
+}
+
+.admin-detail.mobile-open {
+  @media (max-width: $mobile-breakpoint) {
+    transition: transform 0.3s ease;
+    transform: (translateX(50%));
+  }
+}
+
+.admin-detail.mobile-closed {
+  @media (max-width: $mobile-breakpoint) {
+    transition: transform 0.3s ease;
+    transform: (translateX(0));
   }
 }
 
@@ -279,7 +347,9 @@ td.flaggers td {
     }
     .input-setting-string {
       width: 404px;
-      @include medium-width { width: 314px; }
+      @include medium-width {
+        width: 314px;
+      }
       @media (max-width: $mobile-breakpoint) {
         width: 100%;
       }
@@ -505,7 +575,7 @@ section.details {
   }
 
   .count-warning {
-    background-color: dark-light-diff(rgba($danger,.7), $secondary, 50%, -60%);
+    background-color: dark-light-diff(rgba($danger, .7), $secondary, 50%, -60%);
     margin: 0 0 7px 0;
     padding: 10px 20px;
 
@@ -584,7 +654,7 @@ section.details {
     margin-bottom: 10px;
   }
   .current-style {
-    .nav.nav-pills{
+    .nav.nav-pills {
       position: relative;
     }
     .toggle-mobile {
@@ -667,12 +737,25 @@ section.details {
     }
   }
   .colors {
-    thead th       { border: none; }
-    td.hex         { width: 100px; }
-    td.actions     { width: 200px; }
-    .hex-input     { width: 80px; margin-bottom: 0; }
-    .hex           { text-align: center; }
-    .description   { color: scale-color($primary, $lightness: 50%); }
+    thead th {
+      border: none;
+    }
+    td.hex {
+      width: 100px;
+    }
+    td.actions {
+      width: 200px;
+    }
+    .hex-input {
+      width: 80px;
+      margin-bottom: 0;
+    }
+    .hex {
+      text-align: center;
+    }
+    .description {
+      color: scale-color($primary, $lightness: 50%);
+    }
 
     .invalid .hex input {
       background-color: white;
@@ -682,16 +765,27 @@ section.details {
   }
 }
 
-
 .admin-flags {
   table-layout: fixed;
 
-  .hidden-post td.excerpt, .hidden-post td.user { opacity: 0.5; }
-  .deleted td.excerpt, .deleted td.user { background-color: scale-color($danger, $lightness: 70%); }
-  .message { background-color: dark-light-diff($highlight, $secondary, 50%, -70%); }
-  .message:hover { background-color: dark-light-diff($highlight, $secondary, 60%, -60%); }
-  td { vertical-align: top; }
-  th { text-align: left; }
+  .hidden-post td.excerpt, .hidden-post td.user {
+    opacity: 0.5;
+  }
+  .deleted td.excerpt, .deleted td.user {
+    background-color: scale-color($danger, $lightness: 70%);
+  }
+  .message {
+    background-color: dark-light-diff($highlight, $secondary, 50%, -70%);
+  }
+  .message:hover {
+    background-color: dark-light-diff($highlight, $secondary, 60%, -60%);
+  }
+  td {
+    vertical-align: top;
+  }
+  th {
+    text-align: left;
+  }
   .user {
     width: 25px;
     padding: 8px 0 0 0;
@@ -702,7 +796,9 @@ section.details {
     width: 75%;
     padding: 8px;
     word-wrap: break-word;
-    .fa { display: inline-block; }
+    .fa {
+      display: inline-block;
+    }
     h3 {
       max-height: 1.2em;
       overflow: hidden;
@@ -729,15 +825,19 @@ section.details {
     }
   }
   .action {
-     button { margin: 4px; }
-     text-align: right;
-     padding-bottom: 20px;
+    button {
+      margin: 4px;
+    }
+    text-align: right;
+    padding-bottom: 20px;
   }
   td p {
     font-size: 0.929em;
     margin: 0 0 5px 0;
   }
-  .flagged-posts { background: $danger; }
+  .flagged-posts {
+    background: $danger;
+  }
 }
 
 /* Dashboard */
@@ -924,12 +1024,12 @@ table.api-keys {
       ul {
         margin-left: 0;
         padding-left: 20px;
-      li {
-        margin-bottom: 10px;
+        li {
+          margin-bottom: 10px;
         }
       }
+    }
   }
-}
 
   &.totals {
     table {
@@ -957,11 +1057,14 @@ table.api-keys {
 
   .referred-topic-title {
     width: 355px;
-    @include medium-width { width: 305px; }
-    @include small-width  { width: 265px; }
+    @include medium-width {
+      width: 305px;
+    }
+    @include small-width {
+      width: 265px;
+    }
   }
 }
-
 
 .commits-widget {
   border: solid 1px dark-light-diff($primary, $secondary, 90%, -60%);
@@ -1004,13 +1107,13 @@ table.api-keys {
 
   .commits-list {
     height: 149px;
-    overflow-y:auto;
+    overflow-y: auto;
 
     li {
       @extend .clearfix;
       line-height: 1.0em;
       padding: 6px 8px;
-    background-color: dark-light-diff($primary, $secondary, 90%, -60%);
+      background-color: dark-light-diff($primary, $secondary, 90%, -60%);
       .left {
         float: left;
       }
@@ -1187,6 +1290,7 @@ table.api-keys {
     text-align: center;
   }
 }
+
 .screened-ip-addresses {
   .ip_address {
     width: 150px;
@@ -1249,7 +1353,6 @@ table.api-keys {
       color: $primary;
       background-color: dark-light-diff($primary, $secondary, 90%, -60%);
 
-
     }
     .label {
       font-weight: bold;
@@ -1271,6 +1374,7 @@ table.api-keys {
   overflow-x: hidden;
   position: relative;
 }
+
 .ember-list-item-view {
   position: absolute;
 }
@@ -1346,7 +1450,6 @@ $rollback-darker: darken($rollback, 20%) !default;
   overflow: auto;
 }
 
-
 button.ru {
   position: relative;
   min-width: 110px;
@@ -1385,68 +1488,82 @@ button.ru {
   }
 }
 
-@media all
-and (max-width : 850px) {
+@media all and (max-width: 850px) {
   .nav-stacked {
-    .glyph {width: auto; position: relative;}
-    > li > a {padding: 13px}
+    .glyph {
+      width: auto;
+      position: relative;
+    }
+    > li > a {
+      padding: 13px
+    }
   }
 }
 
-@media all
-and (min-width : 320px)
-and (max-width : 500px) {
+@media all and (min-width: 320px) and (max-width: 500px) {
 
-.full-width { margin: 0; }
-.site-settings-nav { width: 100%; }
-.site-settings-detail {
-  width: 100%;
-  padding: 0;
-  border: none;
+  .full-width {
+    margin: 0;
+  }
+  .site-settings-nav {
+    width: 100%;
+  }
+  .site-settings-detail {
+    width: 100%;
+    padding: 0;
+    border: none;
 
-  .settings .setting {
+    .settings .setting {
       .setting-label {
-      float: left;
-      width: 100%;
-      h3 {
-        margin-bottom: 5px;
-        font-weight: bold;
-        margin-top: 25px;
+        float: left;
+        width: 100%;
+        h3 {
+          margin-bottom: 5px;
+          font-weight: bold;
+          margin-top: 25px;
         }
       }
       .setting-value {
         width: 100%;
-        }
+      }
       label {
         font-size: 0.929em;
-        }
+      }
     }
   }
 
   .content-editor {
     width: 100%;
-      .pagedown-editor {
-        box-sizing: border-box;
-      }
+    .pagedown-editor {
+      box-sizing: border-box;
+    }
   }
 
   div.ac-wrap {
     width: 100% !important;
     box-sizing: border-box;
-    }
+  }
 
   .admin-container {
     h2 {
       float: left;
-      }
+    }
   }
 
-  .dashboard-left, .dashboard-right { width: 100%; }
-  .dashboard-stats { margin: 0; }
+  .dashboard-left, .dashboard-right {
+    width: 100%;
+  }
+  .dashboard-stats {
+    margin: 0;
+  }
 
   .badges {
-    .current-badge {margin: 70px 0 0 0;}
-    .current-badge-actions {padding: 0;}
+    .current-badge {
+      margin: 70px 0 0 0;
+    }
+    .current-badge-actions {
+      padding: 0;
+    }
   }
 
   .customize .content-list, .customize .current-style {
@@ -1477,6 +1594,7 @@ tr.not-activated {
     color: #bbb;
   }
 }
+
 .details.not-activated {
   .username .value, .email .value a, .email .value a:visited {
     color: #bbb;
@@ -1533,7 +1651,7 @@ tr.not-activated {
 }
 
 .preview {
- margin-top: 5px;
+  margin-top: 5px;
 }
 
 table#user-badges {
