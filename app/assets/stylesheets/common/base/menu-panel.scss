@@ -114,9 +114,9 @@
   }
 
   input[type='text'] {
-    margin: 0.5em 3px;
+    margin: 0.5em;
     box-sizing: border-box;
-    width: calc(100% - 6px);
+    width: calc(100% - 1em);
     height: 32px;
     padding: 5px;
   }
