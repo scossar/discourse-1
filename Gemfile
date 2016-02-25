@@ -35,9 +35,7 @@ else
 end
 
 gem 'mail'
-gem 'mime-types', require: 'mime/types/columnar'
-
-gem 'hiredis'
+gem 'mime-types', require: 'mime/types/columnar' gem 'hiredis'
 gem 'redis', require:  ["redis", "redis/connection/hiredis"]
 gem 'redis-namespace'
 
@@ -122,6 +120,7 @@ group :test do
 end
 
 group :test, :development do
+  gem 'dotenv-rails'
   gem 'rspec', '~> 3.2.0'
   gem 'mock_redis'
   gem 'listen', '0.7.3', require: false

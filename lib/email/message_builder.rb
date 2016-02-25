@@ -33,6 +33,7 @@ module Email
         if @opts[:include_respond_instructions] == false
           @template_args[:respond_instructions] = ''
         else
+          # This is a test
           @template_args[:respond_instructions] = if allow_reply_by_email?
             @opts[:private_reply] ? I18n.t('user_notifications.reply_by_email_pm', @template_args) : I18n.t('user_notifications.reply_by_email', @template_args)
           else
