@@ -44,8 +44,19 @@ module Middleware
         @is_crawler == :true
       end
 
+      def locale(accept_language_header)
+        begin
+          require 'http_accept_language' unless defined? HttpAcceptLanguage
+          available_locales = ['en', 'fr', 'fa-IR']
+          parser = HttpAcceptLanguage::Parser.new(accept_language_header)
+          parser.compatible_language_from(available_locales)
+        end
+      rescue
+        'en'
+      end
+
       def cache_key
-        @cache_key ||= "ANON_CACHE_#{@env["HTTP_ACCEPT"]}_#{@env["HTTP_HOST"]}#{@env["REQUEST_URI"]}|m=#{is_mobile?}|c=#{is_crawler?}"
+        @cache_key ||= "ANON_CACHE_#{@env["HTTP_ACCEPT"]}_#{locale(@env['HTTP_ACCEPT_LANGUAGE'])}_#{@env["HTTP_HOST"]}#{@env["REQUEST_URI"]}|m=#{is_mobile?}|c=#{is_crawler?}"
       end
 
       def cache_key_body
