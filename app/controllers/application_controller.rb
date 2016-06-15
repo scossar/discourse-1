@@ -336,7 +336,7 @@ class ApplicationController < ActionController::Base
         require 'http_accept_language' unless defined? HttpAcceptLanguage
         available_locales = ['en', 'fr', 'fa-IR']
         parser = HttpAcceptLanguage::Parser.new(request.env["HTTP_ACCEPT_LANGUAGE"])
-        parser.language_region_compatible_from(available_locales)
+        parser.language_region_compatible_from(available_locales).tr('-', '_')
       rescue
         # If Accept-Language headers are not set.
         I18n.default_locale
