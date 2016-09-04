@@ -118,11 +118,11 @@ class OptimizedImage < ActiveRecord::Base
   def self.resize_instructions_animated(from, to, dimensions, opts={})
     %W{
       gifsicle
-      #{from}
       --colors=256
       --resize-fit #{dimensions}
       --optimize=3
       --output #{to}
+      #{from}
     }
   end
 
@@ -142,7 +142,14 @@ class OptimizedImage < ActiveRecord::Base
   end
 
   def self.crop_instructions_animated(from, to, dimensions, opts={})
-    resize_instructions_animated(from, to, dimensions, opts)
+    %W{
+      gifsicle
+      --crop 0,0+#{dimensions}
+      --colors=256
+      --optimize=3
+      --output #{to}
+      #{from}
+    }
   end
 
   def self.downsize_instructions(from, to, dimensions, opts={})
@@ -194,18 +201,20 @@ class OptimizedImage < ActiveRecord::Base
     false
   end
 
-  def self.migrate_to_new_scheme(limit=50)
+  def self.migrate_to_new_scheme(limit=nil)
     problems = []
 
     if SiteSetting.migrate_to_new_scheme
       max_file_size_kb = SiteSetting.max_image_size_kb.kilobytes
       local_store = FileStore::LocalStore.new
 
-      OptimizedImage.includes(:upload)
-                    .where("url NOT LIKE '%/optimized/_X/%'")
-                    .limit(limit)
-                    .order(id: :desc)
-                    .each do |optimized_image|
+      scope = OptimizedImage.includes(:upload)
+        .where("url NOT LIKE '%/optimized/_X/%'")
+        .order(id: :desc)
+
+      scope.limit(limit) if limit
+
+      scope.each do |optimized_image|
         begin
           # keep track of the url
           previous_url = optimized_image.url.dup

@@ -223,9 +223,9 @@ class Upload < ActiveRecord::Base
   def self.get_from_url(url)
     return if url.blank?
     # we store relative urls, so we need to remove any host/cdn
-    url = url.sub(/^#{Discourse.asset_host}/i, "") if Discourse.asset_host.present?
+    url = url.sub(Discourse.asset_host, "") if Discourse.asset_host.present?
     # when using s3, we need to replace with the absolute base url
-    url = url.sub(/^#{SiteSetting.s3_cdn_url}/i, Discourse.store.absolute_base_url) if SiteSetting.s3_cdn_url.present?
+    url = url.sub(SiteSetting.s3_cdn_url, Discourse.store.absolute_base_url) if SiteSetting.s3_cdn_url.present?
     Upload.find_by(url: url)
   end
 
@@ -233,17 +233,17 @@ class Upload < ActiveRecord::Base
     `convert #{path} -auto-orient #{path}`
   end
 
-  def self.migrate_to_new_scheme(limit=50)
+  def self.migrate_to_new_scheme(limit=nil)
     problems = []
 
     if SiteSetting.migrate_to_new_scheme
       max_file_size_kb = [SiteSetting.max_image_size_kb, SiteSetting.max_attachment_size_kb].max.kilobytes
       local_store = FileStore::LocalStore.new
 
-      Upload.where("url NOT LIKE '%/original/_X/%'")
-            .limit(limit)
-            .order(id: :desc)
-            .each do |upload|
+      scope = Upload.where("url NOT LIKE '%/original/_X/%'").order(id: :desc)
+      scope.limit(limit) if limit
+
+      scope.each do |upload|
         begin
           # keep track of the url
           previous_url = upload.url.dup
@@ -269,7 +269,7 @@ class Upload < ActiveRecord::Base
           File.open(path) do |f|
             upload.url = Discourse.store.store_upload(f, upload)
             upload.filesize = f.size
-            upload.save
+            upload.save!
           end
           # remap the URLs
           DbHelper.remap(UrlHelper.absolute(previous_url), upload.url) unless external

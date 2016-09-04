@@ -5,19 +5,33 @@ class ImportScripts::Mbox < ImportScripts::Base
   # CHANGE THESE BEFORE RUNNING THE IMPORTER
 
   BATCH_SIZE = 1000
-  CATEGORY_ID = 6
   MBOX_DIR = File.expand_path("~/import/site")
 
   # Remove to not split individual files
-  SPLIT_AT = /^From owner-/
+  SPLIT_AT = /^From (.*) at/
+
+  # Will create a category if it doesn't exist
+  CATEGORY_MAPPINGS = {
+    "default" => "uncategorized",
+    # ex: "jobs-folder" => "jobs"
+  }
 
   def execute
+    import_categories
     create_email_indices
     create_user_indices
     massage_indices
     import_users
     create_forum_topics
     import_replies
+  end
+
+  def import_categories
+    mappings = CATEGORY_MAPPINGS.values - ['uncategorized']
+
+    create_categories(mappings) do |c|
+      {id: c, name: c}
+    end
   end
 
   def open_db
@@ -43,6 +57,12 @@ class ImportScripts::Mbox < ImportScripts::Base
   def all_messages
     files = Dir["#{MBOX_DIR}/messages/*"]
 
+    CATEGORY_MAPPINGS.keys.each do |k|
+      files << Dir["#{MBOX_DIR}/#{k}/*"]
+    end
+
+    files.flatten!
+
     files.each_with_index do |f, idx|
       if SPLIT_AT.present?
         msg = ""
@@ -52,23 +72,24 @@ class ImportScripts::Mbox < ImportScripts::Base
           if line =~ SPLIT_AT
             if !msg.empty?
               mail = Mail.read_from_string(msg)
-              yield mail
+              yield mail, f
               print_status(idx, files.size)
               msg = ""
             end
           end
           msg << line
         end
+
         if !msg.empty?
           mail = Mail.read_from_string(msg)
-          yield mail
+          yield mail, f
           print_status(idx, files.size)
           msg = ""
         end
       else
         raw = File.read(f)
         mail = Mail.read_from_string(raw)
-        yield mail
+        yield mail, f
         print_status(idx, files.size)
       end
 
@@ -79,7 +100,7 @@ class ImportScripts::Mbox < ImportScripts::Base
     db = open_db
     db.execute "UPDATE emails SET reply_to = null WHERE reply_to = ''"
 
-    rows = db.execute "SELECT msg_id, title, reply_to FROM emails ORDER BY email_date ASC"
+    rows = db.execute "SELECT msg_id, title, reply_to FROM emails ORDER BY datetime(email_date) ASC"
 
     msg_ids = {}
     titles = {}
@@ -115,6 +136,34 @@ class ImportScripts::Mbox < ImportScripts::Base
     db.close
   end
 
+  def extract_name(mail)
+    from_name = nil
+    from = mail[:from]
+
+    from_email = nil
+    if mail.from.present?
+      from_email = mail.from.dup
+      if from_email.kind_of?(Array)
+        from_email = from_email.first.dup
+      end
+
+      from_email.gsub!(/ at /, '@')
+      from_email.gsub!(/ \(.*$/, '')
+    end
+
+    display_names = from.try(:display_names)
+    if display_names.present?
+      from_name = display_names.first
+    end
+
+    if from_name.blank? && from.to_s =~ /\(([^\)]+)\)/
+      from_name = Regexp.last_match[1]
+    end
+    from_name = from.to_s if from_name.blank?
+
+    [from_email, from_name]
+  end
+
   def create_email_indices
     db = open_db
     db.execute "DROP TABLE IF EXISTS emails"
@@ -126,7 +175,8 @@ class ImportScripts::Mbox < ImportScripts::Base
         title VARCHAR(255) NOT NULL,
         reply_to VARCHAR(955) NULL,
         email_date DATETIME NOT NULL,
-        message TEXT NOT NULL
+        message TEXT NOT NULL,
+        category VARCHAR(255) NOT NULL
       );
     SQL
 
@@ -135,35 +185,32 @@ class ImportScripts::Mbox < ImportScripts::Base
 
     puts "", "creating indices"
 
-    all_messages do |mail|
+    all_messages do |mail, filename|
+
+      directory = filename.sub("#{MBOX_DIR}/", '').split("/")[0]
+
+      category = CATEGORY_MAPPINGS[directory] || CATEGORY_MAPPINGS['default'] || 'uncategorized'
+
       msg_id = mail['Message-ID'].to_s
 
       # Many ways to get a name
-      from = mail[:from]
-      from_name = nil
-
-      from_email = nil
-      if mail.from.present?
-        from_email = mail.from.first
-      end
-
-      display_names = from.try(:display_names)
-      if display_names.present?
-        from_name = display_names.first
-      end
-
-      if from_name.blank? && from.to_s =~ /\(([^\)]+)\)/
-        from_name = Regexp.last_match[1]
-      end
-      from_name = from.to_s if from_name.blank?
+      from_email, from_name = extract_name(mail)
 
       title = clean_title(mail['Subject'].to_s)
       reply_to = mail['In-Reply-To'].to_s
       email_date = mail['date'].to_s
+      email_date = DateTime.parse(email_date).to_s unless email_date.blank?
 
-      db.execute "INSERT OR IGNORE INTO emails (msg_id, from_email, from_name, title, reply_to, email_date, message)
-                  VALUES (?, ?, ?, ?, ?, ?, ?)",
-                 [msg_id, from_email, from_name, title, reply_to, email_date, mail.to_s]
+      db.execute "INSERT OR IGNORE INTO emails (msg_id,
+                                                from_email,
+                                                from_name,
+                                                title,
+                                                reply_to,
+                                                email_date,
+                                                message,
+                                                category)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                 [msg_id, from_email, from_name, title, reply_to, email_date, mail.to_s, category]
     end
   ensure
     db.close
@@ -210,8 +257,12 @@ class ImportScripts::Mbox < ImportScripts::Base
     end
   end
 
-  def clean_raw(raw)
-    raw.gsub(/-- \nYou received this message because you are subscribed to the Google Groups "[^"]*" group.\nTo unsubscribe from this group and stop receiving emails from it, send an email to [^+@]+\+unsubscribe@googlegroups.com\.\nFor more options, visit https:\/\/groups\.google\.com\/groups\/opt_out\./, '')
+  def clean_raw(input)
+
+    raw = input.dup
+    raw.gsub!(/-- \nYou received this message because you are subscribed to the Google Groups "[^"]*" group.\nTo unsubscribe from this group and stop receiving emails from it, send an email to [^+@]+\+unsubscribe@googlegroups.com\.\nFor more options, visit https:\/\/groups\.google\.com\/groups\/opt_out\./, '')
+
+    raw
   end
 
   def import_users
@@ -256,7 +307,8 @@ class ImportScripts::Mbox < ImportScripts::Base
                                     from_name,
                                     title,
                                     email_date,
-                                    message
+                                    message,
+                                    category
                             FROM emails
                             WHERE reply_to IS NULL")
 
@@ -274,6 +326,7 @@ class ImportScripts::Mbox < ImportScripts::Base
         mail = Mail.read_from_string(raw_email)
         mail.body
 
+        from_email, _ = extract_name(mail)
         selected = receiver.select_body
         next unless selected
         selected = selected.join('') if selected.kind_of?(Array)
@@ -289,7 +342,7 @@ class ImportScripts::Mbox < ImportScripts::Base
             # read attachment
             File.open(tmp.path, "w+b") { |f| f.write attachment.body.decoded }
             # create the upload for the user
-            upload = Upload.create_for(user_id_from_imported_user_id(mail.from.first) || Discourse::SYSTEM_USER_ID, tmp, attachment.filename, tmp.size )
+            upload = Upload.create_for(user_id_from_imported_user_id(from_email) || Discourse::SYSTEM_USER_ID, tmp, attachment.filename, tmp.size )
             if upload && upload.errors.empty?
               raw << "\n\n#{receiver.attachment_markdown(upload)}\n\n"
             end
@@ -300,9 +353,9 @@ class ImportScripts::Mbox < ImportScripts::Base
 
         { id: t[0],
           title: clean_title(title),
-          user_id: user_id_from_imported_user_id(mail.from.first) || Discourse::SYSTEM_USER_ID,
+          user_id: user_id_from_imported_user_id(from_email) || Discourse::SYSTEM_USER_ID,
           created_at: mail.date,
-          category: CATEGORY_ID,
+          category: t[6],
           raw: clean_raw(raw),
           cook_method: Post.cook_methods[:email] }
       end
@@ -346,6 +399,8 @@ class ImportScripts::Mbox < ImportScripts::Base
         mail = Mail.read_from_string(raw_email)
         mail.body
 
+        from_email, _ = extract_name(mail)
+
         selected = receiver.select_body
         selected = selected.join('') if selected.kind_of?(Array)
         next unless selected
@@ -359,7 +414,7 @@ class ImportScripts::Mbox < ImportScripts::Base
             # read attachment
             File.open(tmp.path, "w+b") { |f| f.write attachment.body.decoded }
             # create the upload for the user
-            upload = Upload.create_for(user_id_from_imported_user_id(mail.from.first) || Discourse::SYSTEM_USER_ID, tmp, attachment.filename, tmp.size )
+            upload = Upload.create_for(user_id_from_imported_user_id(from_email) || Discourse::SYSTEM_USER_ID, tmp, attachment.filename, tmp.size )
             if upload && upload.errors.empty?
               raw << "\n\n#{receiver.attachment_markdown(upload)}\n\n"
             end
@@ -370,7 +425,7 @@ class ImportScripts::Mbox < ImportScripts::Base
 
         { id: id,
           topic_id: topic_id,
-          user_id: user_id_from_imported_user_id(mail.from.first) || Discourse::SYSTEM_USER_ID,
+          user_id: user_id_from_imported_user_id(from_email) || Discourse::SYSTEM_USER_ID,
           created_at: mail.date,
           raw: clean_raw(raw),
           cook_method: Post.cook_methods[:email] }

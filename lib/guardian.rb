@@ -74,8 +74,13 @@ class Guardian
       (
         Rails.configuration.respond_to?(:developer_emails) &&
         Rails.configuration.developer_emails.include?(@user.email)
-      )
+      ) ||
+      Developer.user_ids.include?(@user.id)
     )
+  end
+
+  def is_staged?
+    @user.staged?
   end
 
   # Can the user see the object?
@@ -263,8 +268,6 @@ class Guardian
     (target.is_a?(Group) || target.is_a?(User)) &&
     # User is authenticated
     authenticated? &&
-    # Can't send message to yourself
-    is_not_me?(target) &&
     # Have to be a basic level at least
     @user.has_trust_level?(SiteSetting.min_trust_to_send_messages) &&
     # PMs are enabled

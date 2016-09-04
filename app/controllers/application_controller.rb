@@ -44,6 +44,7 @@ class ApplicationController < ActionController::Base
   before_filter :redirect_to_login_if_required
   before_filter :check_xhr
   after_filter  :add_readonly_header
+  after_filter  :perform_refresh_session
 
   layout :set_layout
 
@@ -57,6 +58,10 @@ class ApplicationController < ActionController::Base
 
   def add_readonly_header
     response.headers['Discourse-Readonly'] = 'true' if Discourse.readonly_mode?
+  end
+
+  def perform_refresh_session
+    refresh_session(current_user)
   end
 
   def slow_platform?
@@ -293,13 +298,15 @@ class ApplicationController < ActionController::Base
     Middleware::AnonymousCache.anon_cache(request.env, time_length)
   end
 
-  def fetch_user_from_params(opts=nil)
+  def fetch_user_from_params(opts=nil, eager_load = [])
     opts ||= {}
     user = if params[:username]
       username_lower = params[:username].downcase.chomp('.json')
       find_opts = { username_lower: username_lower }
       find_opts[:active] = true unless opts[:include_inactive] || current_user.try(:staff?)
-      User.find_by(find_opts)
+      result = User
+      (result = result.includes(*eager_load)) if !eager_load.empty?
+      result.find_by(find_opts)
     elsif params[:external_id]
       external_id = params[:external_id].chomp('.json')
       SingleSignOnRecord.find_by(external_id: external_id).try(:user)
@@ -313,9 +320,7 @@ class ApplicationController < ActionController::Base
   def post_ids_including_replies
     post_ids = params[:post_ids].map {|p| p.to_i}
     if params[:reply_post_ids]
-      post_ids << PostReply.where(post_id: params[:reply_post_ids].map {|p| p.to_i}).pluck(:reply_id)
-      post_ids.flatten!
-      post_ids.uniq!
+      post_ids |= PostReply.where(post_id: params[:reply_post_ids].map {|p| p.to_i}).pluck(:reply_id)
     end
     post_ids
   end
@@ -447,7 +452,7 @@ class ApplicationController < ActionController::Base
 
     def check_xhr
       # bypass xhr check on PUT / POST / DELETE provided api key is there, otherwise calling api is annoying
-      return if !request.get? && api_key_valid?
+      return if !request.get? && is_api?
       raise RenderEmpty.new unless ((request.format && request.format.json?) || request.xhr?)
     end
 
@@ -464,7 +469,7 @@ class ApplicationController < ActionController::Base
     end
 
     def redirect_to_login_if_required
-      return if current_user || (request.format.json? && api_key_valid?)
+      return if current_user || (request.format.json? && is_api?)
 
       # redirect user to the SSO page if we need to log in AND SSO is enabled
       if SiteSetting.login_required?
@@ -507,10 +512,6 @@ class ApplicationController < ActionController::Base
         post_serializer.post_actions = counts
       end
       render_json_dump(post_serializer)
-    end
-
-    def api_key_valid?
-      request["api_key"] && ApiKey.where(key: request["api_key"]).exists?
     end
 
     # returns an array of integers given a param key

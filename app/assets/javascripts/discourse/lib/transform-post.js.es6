@@ -19,7 +19,7 @@ export function includeAttributes(...attributes) {
 export function transformBasicPost(post) {
   // Note: it can be dangerous to not use `get` in Ember code, but this is significantly
   // faster and has tests to confirm it works. We only call `get` when the property is a CP
-  return {
+  const postAtts = {
     id: post.id,
     hidden: post.hidden,
     deleted: post.get('deleted'),
@@ -28,7 +28,10 @@ export function transformBasicPost(post) {
     isDeleted: post.deleted_at || post.user_deleted,
     deletedByAvatarTemplate: null,
     deletedByUsername: null,
-    primary_group_name: post.primary_group_name,
+    primaryGroupName: post.primary_group_name,
+    primaryGroupFlairUrl: post.primary_group_flair_url,
+    primaryGroupFlairBgColor: post.primary_group_flair_bg_color,
+    primaryGroupFlairColor: post.primary_group_flair_color,
     wiki: post.wiki,
     firstPost: post.post_number === 1,
     post_number: post.post_number,
@@ -73,6 +76,9 @@ export function transformBasicPost(post) {
     replyCount: post.reply_count,
   };
 
+  _additionalAttributes.forEach(a => postAtts[a] = post[a]);
+
+  return postAtts;
 }
 
 
@@ -110,6 +116,7 @@ export default function transformPost(currentUser, site, post, prevPost, nextPos
   postAtts.actionCodeWho = post.action_code_who;
   postAtts.userCustomFields = post.user_custom_fields;
   postAtts.topicUrl = topic.get('url');
+  postAtts.isSaving = post.isSaving;
 
   const showPMMap = topic.archetype === 'private_message' && post.post_number === 1;
   if (showPMMap) {
@@ -189,6 +196,10 @@ export default function transformPost(currentUser, site, post, prevPost, nextPos
     postAtts.canToggleLike = likeAction.get('canToggle');
     postAtts.showLike = postAtts.liked || postAtts.canToggleLike;
     postAtts.likeCount = likeAction.count;
+  }
+
+  if (!currentUser) {
+    postAtts.showLike = !topic.archived;
   }
 
   if (postAtts.post_number === 1) {

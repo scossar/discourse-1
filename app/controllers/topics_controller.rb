@@ -396,8 +396,7 @@ class TopicsController < ApplicationController
     if topic.private_message?
       guardian.ensure_can_send_private_message!(group)
       topic.invite_group(current_user, group)
-
-      render json: success_json
+      render_json_dump BasicGroupSerializer.new(group, scope: guardian, root: 'group')
     else
       render json: failed_json, status: 422
     end
@@ -621,6 +620,12 @@ class TopicsController < ApplicationController
   end
 
   def perform_show_response
+
+    if request.head?
+      head :ok
+      return
+    end
+
     topic_view_serializer = TopicViewSerializer.new(@topic_view, scope: guardian, root: false, include_raw: !!params[:include_raw])
 
     respond_to do |format|
